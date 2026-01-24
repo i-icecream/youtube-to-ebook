@@ -583,12 +583,14 @@ if page == "Generate":
         if st.button("Generate & Send Newsletter", type="primary", use_container_width=True):
             with st.spinner("Crafting your newsletter..."):
                 try:
+                    # Note: If this fails with ModuleNotFoundError, replace "python3" with your full Python path
+                    # Find it by running: which python3
                     result = subprocess.run(
                         ["python3", str(PROJECT_DIR / "main.py")],
                         capture_output=True,
                         text=True,
                         cwd=str(PROJECT_DIR),
-                        timeout=300
+                        timeout=600
                     )
 
                     if "Newsletter sent successfully" in result.stdout:

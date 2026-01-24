@@ -72,6 +72,21 @@ cp com.youtube.newsletter.plist ~/Library/LaunchAgents/
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.youtube.newsletter.plist
 ```
 
+## Troubleshooting
+
+### "ModuleNotFoundError" when running automation
+
+Your Mac may have multiple Python installations. The automation scripts use `python3`, but your packages might be installed in a different Python.
+
+**Fix:** Find your Python path and update the scripts:
+```bash
+# Find where your Python is
+which python3
+
+# Update run_newsletter.sh and dashboard.py with the full path
+# Example: /Library/Frameworks/Python.framework/Versions/3.11/bin/python3
+```
+
 ## Known Issues & Solutions
 
 This project documents several YouTube API quirks:
@@ -83,6 +98,7 @@ This project documents several YouTube API quirks:
 | Transcript API syntax changed | Use instance method `ytt_api.fetch()` |
 | Cloud servers blocked | Run locally, not GitHub Actions |
 | Names misspelled in transcripts | Include video description in Claude context |
+| Articles truncated mid-sentence | Increase `max_tokens` in write_articles.py |
 
 See [SKILL.md](SKILL.md) for detailed explanations.
 
