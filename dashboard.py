@@ -13,6 +13,16 @@ from datetime import datetime
 from pathlib import Path
 
 # ============================================
+# PAGE CONFIG - Must be the FIRST Streamlit command
+# ============================================
+st.set_page_config(
+    page_title="The Digest",
+    page_icon="📰",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ============================================
 # STREAMLIT CLOUD SECRETS → ENV VARS BRIDGE
 # On Streamlit Cloud, secrets are set in the app settings UI.
 # Pipeline modules (get_videos.py, etc.) use os.getenv(),
@@ -36,7 +46,10 @@ for _key in _SECRET_KEYS:
 # PASSWORD PROTECTION
 # Set APP_PASSWORD in Streamlit secrets or .env to enable.
 # ============================================
-_app_password = os.environ.get("APP_PASSWORD", "") or st.secrets.get("APP_PASSWORD", "")
+try:
+    _app_password = os.environ.get("APP_PASSWORD", "") or st.secrets.get("APP_PASSWORD", "")
+except FileNotFoundError:
+    _app_password = ""
 if _app_password:
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
@@ -79,13 +92,6 @@ PLIST_FILE = Path.home() / "Library/LaunchAgents/com.youtube.newsletter.plist"
 # Create newsletters directory if it doesn't exist
 NEWSLETTERS_DIR.mkdir(exist_ok=True)
 
-st.set_page_config(
-    page_title="The Digest",
-    page_icon="📰",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 # ============================================
 # CUSTOM CSS - Editorial Magazine Aesthetic
 # ============================================
@@ -120,7 +126,6 @@ st.markdown("""
     /* Hide default streamlit elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
 
     /* Sidebar */
     [data-testid="stSidebar"] {
