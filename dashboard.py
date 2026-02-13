@@ -31,6 +31,37 @@ for _key in _SECRET_KEYS:
         except (KeyError, FileNotFoundError):
             pass
 
+# ============================================
+# PASSWORD PROTECTION
+# Set APP_PASSWORD in Streamlit secrets or .env to enable.
+# ============================================
+_app_password = os.environ.get("APP_PASSWORD", "") or st.secrets.get("APP_PASSWORD", "")
+if _app_password:
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+
+    if not st.session_state.authenticated:
+        st.markdown("""
+        <div style="text-align: center; padding: 4rem 0 2rem 0;">
+            <div style="font-family: 'Cormorant Garamond', serif; font-size: 2.5rem; font-weight: 700;
+                        letter-spacing: 0.1em; color: #d4a855;">THE DIGEST</div>
+            <div style="font-family: 'Sora', sans-serif; font-size: 0.8rem; letter-spacing: 0.15em;
+                        text-transform: uppercase; color: #5c5850; margin-top: 0.5rem;">Please enter password to continue</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            password = st.text_input("Password", type="password", label_visibility="collapsed",
+                                     placeholder="Enter password")
+            if st.button("Enter", type="primary", use_container_width=True):
+                if password == _app_password:
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect password")
+        st.stop()
+
 # Detect if running on Streamlit Cloud (no macOS launchd available)
 IS_CLOUD = os.environ.get("STREAMLIT_SHARING_MODE") == "true" or not Path.home().joinpath(
     "Library/LaunchAgents"
