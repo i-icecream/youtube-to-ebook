@@ -5,6 +5,7 @@ A beautiful web interface to manage your newsletter.
 
 import streamlit as st
 import os
+import sys
 import json
 import subprocess
 import re
@@ -642,7 +643,7 @@ if page == "Generate":
                     # Note: If this fails with ModuleNotFoundError, replace "python3" with your full Python path
                     # Find it by running: which python3
                     result = subprocess.run(
-                        ["python3", str(PROJECT_DIR / "main.py")],
+                        [sys.executable, str(PROJECT_DIR / "main.py")],
                         capture_output=True,
                         text=True,
                         cwd=str(PROJECT_DIR),
