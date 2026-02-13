@@ -7,7 +7,7 @@ import streamlit as st
 import os
 import sys
 import json
-import subprocess
+import io
 import re
 from datetime import datetime
 from pathlib import Path
@@ -640,28 +640,32 @@ if page == "Generate":
         if st.button("Generate & Send Newsletter", type="primary", use_container_width=True):
             with st.spinner("Crafting your newsletter..."):
                 try:
-                    # Note: If this fails with ModuleNotFoundError, replace "python3" with your full Python path
-                    # Find it by running: which python3
-                    result = subprocess.run(
-                        [sys.executable, str(PROJECT_DIR / "main.py")],
-                        capture_output=True,
-                        text=True,
-                        cwd=str(PROJECT_DIR),
-                        timeout=600
-                    )
+                    # Import and run directly (avoids subprocess Python path issues)
+                    sys.path.insert(0, str(PROJECT_DIR))
+                    from main import run as run_pipeline
 
-                    if "Newsletter sent successfully" in result.stdout:
+                    # Capture print output
+                    captured = io.StringIO()
+                    old_stdout = sys.stdout
+                    sys.stdout = captured
+
+                    try:
+                        run_pipeline()
+                    finally:
+                        sys.stdout = old_stdout
+
+                    output = captured.getvalue()
+
+                    if "Newsletter sent successfully" in output or "DONE" in output:
                         st.success("Newsletter sent! Check your inbox.")
-                    elif "No new videos" in result.stdout:
+                    elif "No new videos" in output:
                         st.info("No new videos to process. All caught up!")
                     else:
                         st.warning("Completed with notes. See log below.")
 
                     with st.expander("View Output Log"):
-                        st.code(result.stdout + result.stderr, language="text")
+                        st.code(output, language="text")
 
-                except subprocess.TimeoutExpired:
-                    st.error("Process timed out. Try again.")
                 except Exception as e:
                     st.error(f"Error: {e}")
 
