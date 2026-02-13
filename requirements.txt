@@ -5,3 +5,4 @@ anthropic
 markdown
 ebooklib
 requests
+streamlit

@@ -11,6 +11,31 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+# ============================================
+# STREAMLIT CLOUD SECRETS → ENV VARS BRIDGE
+# On Streamlit Cloud, secrets are set in the app settings UI.
+# Pipeline modules (get_videos.py, etc.) use os.getenv(),
+# so we inject st.secrets into os.environ at startup.
+# ============================================
+_SECRET_KEYS = [
+    "YOUTUBE_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GMAIL_ADDRESS",
+    "GMAIL_APP_PASSWORD",
+    "SUPADATA_API_KEY",
+]
+for _key in _SECRET_KEYS:
+    if _key not in os.environ:
+        try:
+            os.environ[_key] = st.secrets[_key]
+        except (KeyError, FileNotFoundError):
+            pass
+
+# Detect if running on Streamlit Cloud (no macOS launchd available)
+IS_CLOUD = os.environ.get("STREAMLIT_SHARING_MODE") == "true" or not Path.home().joinpath(
+    "Library/LaunchAgents"
+).exists()
+
 # Paths
 PROJECT_DIR = Path(__file__).parent
 CHANNELS_FILE = PROJECT_DIR / "get_videos.py"
@@ -845,43 +870,71 @@ elif page == "Archive":
 # ============================================
 elif page == "Schedule":
     st.markdown("## Schedule")
-    st.write("Set when your newsletter runs automatically.")
 
-    weekday, hour = get_schedule()
-    days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    if IS_CLOUD:
+        # Cloud deployment - no macOS launchd
+        st.write("Automatic scheduling options for cloud deployment:")
 
-    col1, col2 = st.columns(2)
+        st.markdown("""
+        #### GitHub Actions (Recommended)
 
-    with col1:
-        new_day = st.selectbox(
-            "Day",
-            options=list(range(7)),
-            format_func=lambda x: days[x],
-            index=weekday
-        )
+        This project includes a GitHub Actions workflow that runs the newsletter
+        automatically. It's pre-configured for **Wednesdays at 7:00 AM PST**.
 
-    with col2:
-        new_hour = st.selectbox(
-            "Time",
-            options=list(range(24)),
-            format_func=lambda x: f"{x:02d}:00" + (" AM" if x < 12 else " PM"),
-            index=hour
-        )
+        To enable it:
+        1. Go to your GitHub repo **Settings → Secrets and variables → Actions**
+        2. Add these secrets: `YOUTUBE_API_KEY`, `ANTHROPIC_API_KEY`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `SUPADATA_API_KEY`
+        3. Go to **Actions** tab and enable the workflow
 
-    st.markdown(f"**Currently scheduled:** {days[weekday]} at {hour:02d}:00")
+        You can also trigger it manually from the Actions tab at any time.
+        """)
 
-    if new_day != weekday or new_hour != hour:
-        st.markdown(f"**New schedule:** {days[new_day]} at {new_hour:02d}:00")
+        st.divider()
 
-        if st.button("Update Schedule", type="primary"):
-            if save_schedule(new_day, new_hour):
-                st.success(f"Updated to {days[new_day]} at {new_hour:02d}:00!")
-            else:
-                st.error("Couldn't update schedule")
+        st.markdown("""
+        #### Manual Generation
 
-    st.divider()
+        You can always generate a newsletter on-demand from the **Generate** page.
+        """)
+    else:
+        # Local macOS deployment - use launchd
+        st.write("Set when your newsletter runs automatically.")
 
-    st.caption("Your Mac must be awake at the scheduled time for the newsletter to run automatically.")
+        weekday, hour = get_schedule()
+        days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            new_day = st.selectbox(
+                "Day",
+                options=list(range(7)),
+                format_func=lambda x: days[x],
+                index=weekday
+            )
+
+        with col2:
+            new_hour = st.selectbox(
+                "Time",
+                options=list(range(24)),
+                format_func=lambda x: f"{x:02d}:00" + (" AM" if x < 12 else " PM"),
+                index=hour
+            )
+
+        st.markdown(f"**Currently scheduled:** {days[weekday]} at {hour:02d}:00")
+
+        if new_day != weekday or new_hour != hour:
+            st.markdown(f"**New schedule:** {days[new_day]} at {new_hour:02d}:00")
+
+            if st.button("Update Schedule", type="primary"):
+                if save_schedule(new_day, new_hour):
+                    st.success(f"Updated to {days[new_day]} at {new_hour:02d}:00!")
+                else:
+                    st.error("Couldn't update schedule")
+
+        st.divider()
+
+        st.caption("Your Mac must be awake at the scheduled time for the newsletter to run automatically.")
 
 # ============================================
 # Footer
