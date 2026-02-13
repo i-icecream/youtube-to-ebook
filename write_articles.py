@@ -1,18 +1,18 @@
 """
-Part 3: Transform Transcripts into Magazine Articles using Claude AI
+Part 3: Transform Transcripts into Magazine Articles using Gemini AI
 Takes raw video transcripts and turns them into polished, readable articles.
 """
 
 import os
-import anthropic
+from google import genai
 from dotenv import load_dotenv
 
 # Load your API key
 load_dotenv()
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Create the Claude client
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+# Create the Gemini client
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 def write_article(video):
@@ -45,15 +45,12 @@ Remix this YouTube transcript into a magazine article. Guidelines:
 Format the article in clean markdown."""
 
     try:
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=8000,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
         )
 
-        return message.content[0].text
+        return response.text
 
     except Exception as e:
         print(f"  ⚠ Error generating article: {e}")
