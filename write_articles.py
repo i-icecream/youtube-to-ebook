@@ -9,10 +9,18 @@ from dotenv import load_dotenv
 
 # Load your API key
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Create the Gemini client
-client = genai.Client(api_key=GEMINI_API_KEY)
+# Lazy client — only created when actually needed
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY environment variable is not set")
+        _client = genai.Client(api_key=api_key)
+    return _client
 
 
 def write_article(video):
@@ -45,7 +53,7 @@ Remix this YouTube transcript into a magazine article. Guidelines:
 Format the article in clean markdown."""
 
     try:
-        response = client.models.generate_content(
+        response = _get_client().models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
         )
@@ -61,7 +69,7 @@ def write_articles_for_videos(videos):
     """
     Generate articles for all videos with transcripts.
     """
-    print("\nGenerating articles with Claude AI...\n")
+    print("\nGenerating articles with Gemini AI...\n")
     print("=" * 60)
 
     articles = []
