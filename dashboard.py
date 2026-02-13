@@ -616,7 +616,7 @@ with st.sidebar:
 
     page = st.radio(
         "NAVIGATION",
-        ["Generate", "Channels", "Writing Style", "Archive", "Schedule"],
+        ["Generate", "Podcast", "Channels", "Writing Style", "Archive", "Schedule"],
         label_visibility="visible"
     )
 
@@ -696,6 +696,128 @@ if page == "Generate":
 
     with col3:
         st.metric("Next Run", f"{days[weekday]} {hour}:00")
+
+# ============================================
+# PAGE: Podcast
+# ============================================
+elif page == "Podcast":
+    st.markdown("## Podcast to Article")
+    st.write("Paste a 小宇宙 episode link, and Gemini will transcribe the audio and rewrite it as a magazine-style article.")
+
+    # Initialize session state
+    if "podcast_result" not in st.session_state:
+        st.session_state.podcast_result = None
+    if "podcast_error" not in st.session_state:
+        st.session_state.podcast_error = None
+
+    with st.form(key="podcast_form", clear_on_submit=False):
+        episode_url = st.text_input(
+            "Episode URL or ID",
+            placeholder="https://www.xiaoyuzhoufm.com/episode/6123983acc5f215c6e0b7e6d",
+            label_visibility="collapsed",
+        )
+        submitted = st.form_submit_button("Generate Article", type="primary", use_container_width=True)
+
+    st.caption("Supports xiaoyuzhoufm.com episode URLs or raw episode IDs")
+
+    if submitted and episode_url:
+        st.session_state.podcast_result = None
+        st.session_state.podcast_error = None
+
+        try:
+            sys.path.insert(0, str(PROJECT_DIR))
+            from podcast_to_article import parse_episode_id, fetch_episode_info, download_audio, transcribe_and_write, save_results
+
+            progress = st.progress(0, text="Parsing episode ID...")
+            episode_id = parse_episode_id(episode_url.strip())
+
+            progress.progress(10, text="Fetching episode info from 小宇宙...")
+            episode_info = fetch_episode_info(episode_id)
+
+            if not episode_info["audio_url"]:
+                st.error("No audio URL found for this episode.")
+            else:
+                # Show episode info
+                st.markdown(f"""
+                <div style="background: #1e1e1e; border: 1px solid #2a2a2a; border-radius: 12px;
+                            padding: 1.25rem; margin: 1rem 0;">
+                    <div style="font-family: 'Cormorant Garamond', serif; font-size: 1.4rem;
+                                font-weight: 600; color: #d4a855; margin-bottom: 0.5rem;">
+                        {episode_info['title']}</div>
+                    <div style="font-family: 'Sora', sans-serif; font-size: 0.85rem; color: #9a958c;">
+                        {episode_info['podcast_name']} · {episode_info['duration'] // 60} min</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                progress.progress(20, text="Downloading audio...")
+                audio_path = download_audio(episode_info["audio_url"], episode_id)
+
+                progress.progress(40, text="Uploading audio to Gemini & generating article (this may take a few minutes)...")
+                result_text = transcribe_and_write(audio_path, episode_info)
+
+                progress.progress(90, text="Saving results...")
+                article_file = save_results(result_text, episode_info)
+
+                progress.progress(100, text="Done!")
+
+                st.session_state.podcast_result = {
+                    "text": result_text,
+                    "episode_info": episode_info,
+                    "article_file": article_file,
+                }
+
+        except Exception as e:
+            st.session_state.podcast_error = str(e)
+
+    # Display error
+    if st.session_state.podcast_error:
+        st.error(f"Error: {st.session_state.podcast_error}")
+
+    # Display result
+    if st.session_state.podcast_result:
+        result = st.session_state.podcast_result
+        info = result["episode_info"]
+
+        st.success(f"Article generated for: {info['title']}")
+
+        # Extract article portion (after </transcript> tag, or full text)
+        import re as _re
+        raw = result["text"]
+        t_match = _re.search(r'</transcript>', raw)
+        article_text = raw[t_match.end():].strip() if t_match else raw
+
+        # Show article
+        tab_article, tab_transcript, tab_raw = st.tabs(["Article", "Transcript", "Raw Output"])
+
+        with tab_article:
+            st.markdown(article_text)
+
+        with tab_transcript:
+            t_content_match = _re.search(r'<transcript>(.*?)</transcript>', raw, _re.DOTALL)
+            if t_content_match:
+                st.text_area("Transcript", value=t_content_match.group(1).strip(), height=500, label_visibility="collapsed")
+            else:
+                st.info("No separate transcript found in output.")
+
+        with tab_raw:
+            st.text_area("Raw", value=raw, height=500, label_visibility="collapsed")
+
+        # Download buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button(
+                "Download Article (.md)",
+                article_text,
+                file_name=f"article_{info['episode_id'][:8]}.md",
+                mime="text/markdown",
+            )
+        with col2:
+            st.download_button(
+                "Download Full Output",
+                raw,
+                file_name=f"raw_{info['episode_id'][:8]}.md",
+                mime="text/markdown",
+            )
 
 # ============================================
 # PAGE: Channels
@@ -782,7 +904,7 @@ elif page == "Channels":
 # ============================================
 elif page == "Writing Style":
     st.markdown("## Writing Style")
-    st.write("Customize how Claude AI writes your articles.")
+    st.write("Customize how Gemini AI writes your articles.")
 
     with open(PROMPT_FILE) as f:
         content = f.read()
@@ -976,4 +1098,4 @@ elif page == "Schedule":
 # Footer
 # ============================================
 st.markdown("---")
-st.caption("The Digest • Powered by Claude AI")
+st.caption("The Digest • Powered by Gemini AI")
