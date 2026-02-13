@@ -169,59 +169,29 @@ def transcribe_and_write(audio_path, episode_info):
     return response.text
 
 
-def save_results(text, episode_info):
-    """保存结果：分别存转录稿和文章"""
-    eid = episode_info["episode_id"]
-    safe_title = re.sub(r'[^\w\u4e00-\u9fff]', '_', episode_info["title"])[:50]
-
-    # 提取转录稿
+def extract_article(text):
+    """从 Gemini 输出中提取文章部分（去掉 <transcript> 标签内容）"""
     transcript_match = re.search(r'<transcript>(.*?)</transcript>', text, re.DOTALL)
     if transcript_match:
-        transcript = transcript_match.group(1).strip()
-        transcript_file = f"transcript_{safe_title}_{eid[:8]}.txt"
-        with open(transcript_file, "w", encoding="utf-8") as f:
-            f.write(transcript)
-        print(f"  转录稿已保存: {transcript_file}")
-
-        # 文章 = 转录稿之后的部分
-        article = text[transcript_match.end():].strip()
-    else:
-        # 没有标签分隔，整体保存
-        article = text
-        print(f"  （未找到转录标签，全部内容视为文章）")
-
-    article_file = f"article_{safe_title}_{eid[:8]}.md"
-    with open(article_file, "w", encoding="utf-8") as f:
-        f.write(article)
-    print(f"  文章已保存: {article_file}")
-
-    # 也保存完整原始输出
-    raw_file = f"raw_{safe_title}_{eid[:8]}.md"
-    with open(raw_file, "w", encoding="utf-8") as f:
-        f.write(text)
-    print(f"  完整输出: {raw_file}")
-
-    return article_file
+        return text[transcript_match.end():].strip()
+    return text
 
 
-def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(1)
-
-    episode_input = sys.argv[1]
+def run(episode_input):
+    """完整管线：解析 → 抓取 → 下载 → 转录改写 → 发邮件（含 EPUB）"""
+    from send_email import send_newsletter
 
     print("=" * 60)
     print("播客 → 文章 (Gemini 2.5 Flash)")
     print("=" * 60)
 
     # Step 1: 解析 episode ID
-    print("\n[1/4] 解析播客单集...")
+    print("\n[1/5] 解析播客单集...")
     episode_id = parse_episode_id(episode_input)
     print(f"  Episode ID: {episode_id}")
 
     # Step 2: 获取单集信息
-    print("\n[2/4] 获取单集信息...")
+    print("\n[2/5] 获取单集信息...")
     episode_info = fetch_episode_info(episode_id)
 
     if not episode_info["audio_url"]:
@@ -229,21 +199,40 @@ def main():
         sys.exit(1)
 
     # Step 3: 下载音频
-    print("\n[3/4] 下载音频...")
+    print("\n[3/5] 下载音频...")
     audio_path = download_audio(episode_info["audio_url"], episode_id)
 
     # Step 4: Gemini 转录 + 改写
-    print("\n[4/4] Gemini AI 转录 + 改写...")
-    result = transcribe_and_write(audio_path, episode_info)
+    print("\n[4/5] Gemini AI 转录 + 改写...")
+    result_text = transcribe_and_write(audio_path, episode_info)
+    article = extract_article(result_text)
 
-    # 保存结果
-    print("\n保存结果...")
-    article_file = save_results(result, episode_info)
+    # Step 5: 发送邮件 + EPUB
+    print("\n[5/5] 发送邮件...")
+    episode_url = f"https://www.xiaoyuzhoufm.com/episode/{episode_id}"
+    articles = [{
+        "title": episode_info["title"],
+        "channel": episode_info["podcast_name"],
+        "url": episode_url,
+        "article": article,
+    }]
+    send_newsletter(articles)
+
+    # 清理音频文件
+    if os.path.exists(audio_path):
+        os.remove(audio_path)
+        print(f"  已清理音频: {audio_path}")
 
     print("\n" + "=" * 60)
-    print("✓ 完成！")
-    print(f"  文章文件: {article_file}")
+    print("✓ 完成！文章已发送到邮箱（含 EPUB）")
     print("=" * 60)
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(1)
+    run(sys.argv[1])
 
 
 if __name__ == "__main__":
